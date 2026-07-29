@@ -22,6 +22,12 @@ The reproducible development environment pins Rust 1.85.0. Run project commands 
 nix develop --command cargo build
 ```
 
+## Stability
+
+v0.1.0 is an early, pre-1.0 release. Command behavior, human-readable output
+formats, and exit-code semantics may change in breaking ways before 1.0.
+Scripts should pin the pathbin version and verify behavior when upgrading.
+
 ## Platform support
 
 pathbin v0.1.0 officially supports:
