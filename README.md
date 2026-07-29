@@ -32,6 +32,23 @@ pathbin v0.1.0 officially supports:
 Windows support is experimental in v0.1.0. Other operating systems are
 untested and not officially supported.
 
+## Known limitations
+
+pathbin inspects filesystem entries in `PATH`; it does not fully emulate a
+shell's command-resolution rules.
+
+- Shell aliases, functions, built-ins, keywords, and command hashes are not
+  discovered.
+- Each `PATH` directory is scanned only at its top level. Subdirectories are
+  not searched recursively.
+- On Unix, a regular file is considered executable when any executable
+  permission bit is set. ACLs, mount options, and the current user's effective
+  access are not evaluated.
+- On Windows, executable detection uses a fixed set of recognized extensions
+  and does not yet reproduce all `PATHEXT` and case-insensitive lookup rules.
+- Output describes the filesystem at scan time and can become stale if files
+  or `PATH` change while the command is running.
+
 ## Features
 - List executable binaries in `PATH`
 - Show where a command is located
