@@ -27,6 +27,12 @@ If private vulnerability reporting is unavailable, open a public issue titled
 `Security contact request` without including any vulnerability details. A
 maintainer will arrange a private communication channel.
 
+Private vulnerability reporting is available only when supported by the
+repository's current visibility and GitHub plan. Maintainers must verify that
+the **Report a vulnerability** link above works before making the repository
+public or announcing a release. The public contact-request fallback remains
+available if GitHub does not provide the private reporting form.
+
 Include as much of the following information as possible in the private
 report:
 
@@ -65,3 +71,16 @@ appropriate.
 
 General bugs, feature requests, and support questions that do not have a
 security impact should be reported through the public issue tracker.
+
+## Repository security controls
+
+Maintainers keep dependency vulnerability alerts and automated security fixes
+enabled in the repository settings. Dependabot checks both Cargo dependencies
+and pinned GitHub Actions each week using `.github/dependabot.yml`.
+
+GitHub availability for secret scanning, push protection, and private
+vulnerability reporting depends on repository visibility and plan. Before a
+visibility change or public announcement, maintainers must enable every
+available control and verify the security-reporting link above. Until secret
+scanning is available, maintainers should continue to scan the full Git history
+with a dedicated secret scanner before each public release.
