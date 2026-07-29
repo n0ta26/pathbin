@@ -52,3 +52,13 @@ Cargo packaged the 15 reviewed files, compiled the packaged crate
 successfully, and stopped before upload as required by dry-run mode. The only
 warning was the expected `aborting upload due to dry run`; there were no
 package metadata, content, build, or verification warnings.
+
+## Release tag ancestry
+
+The CD workflow accepts a release tag only when its peeled commit is reachable
+from `origin/main`. This prevents a tag created from an unmerged branch or
+another arbitrary commit from publishing release artifacts.
+
+The validation fetches `main` directly from `origin` and uses
+`git merge-base --is-ancestor` so annotated and signed tags are checked by their
+target commit rather than by the tag object itself.
