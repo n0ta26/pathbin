@@ -3,6 +3,15 @@
 
 It extracts executable binaries from `PATH` and helps you understand command resolution, duplicates, shadowed binaries, and broken paths.
 
+## Installation
+
+Install Rust 1.85 or newer, including Cargo, and then install pathbin from
+crates.io:
+
+```console
+cargo install pathbin
+```
+
 ## Minimum supported Rust version
 
 pathbin v0.1.0 supports Rust 1.85 and newer.
