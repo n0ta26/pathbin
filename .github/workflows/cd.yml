@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust 1.85.0
         uses: dtolnay/rust-toolchain@1.85.0
@@ -107,7 +107,7 @@ jobs:
           Compress-Archive -Path $archiveName -DestinationPath "$archiveName.zip"
 
       - name: Upload release archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.target }}
           path: pathbin-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_extension }}
@@ -122,10 +122,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Download release archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: dist
@@ -137,6 +139,42 @@ jobs:
           cd dist
           sha256sum pathbin-* > SHA256SUMS
 
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          previous_tag=""
+          while IFS= read -r tag; do
+            if [[ "$tag" != "$GITHUB_REF_NAME" ]]; then
+              previous_tag="$tag"
+              break
+            fi
+          done < <(
+            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq 'map(select(.draft == false and .prerelease == false)) | .[].tag_name'
+          )
+
+          generate_args=(
+            --field "tag_name=${GITHUB_REF_NAME}"
+            --field "target_commitish=${GITHUB_SHA}"
+          )
+          if [[ -n "$previous_tag" ]]; then
+            generate_args+=(--field "previous_tag_name=${previous_tag}")
+          fi
+
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            "${generate_args[@]}" \
+            --jq .body > GENERATED_CHANGELOG.md
+
+          cp RELEASE_NOTES.md GENERATED_RELEASE_NOTES.md
+          printf '\n' >> GENERATED_RELEASE_NOTES.md
+          if ! grep -q "^## What's Changed" GENERATED_CHANGELOG.md; then
+            printf "## What's Changed\n\n" >> GENERATED_RELEASE_NOTES.md
+          fi
+          cat GENERATED_CHANGELOG.md >> GENERATED_RELEASE_NOTES.md
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -146,10 +184,10 @@ jobs:
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber
             gh release edit "$GITHUB_REF_NAME" \
               --title "pathbin ${GITHUB_REF_NAME}" \
-              --notes-file RELEASE_NOTES.md
+              --notes-file GENERATED_RELEASE_NOTES.md
           else
             gh release create "$GITHUB_REF_NAME" dist/* \
               --verify-tag \
               --title "pathbin ${GITHUB_REF_NAME}" \
-              --notes-file RELEASE_NOTES.md
+              --notes-file GENERATED_RELEASE_NOTES.md
           fi

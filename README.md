@@ -14,7 +14,7 @@ cargo install pathbin
 
 ## Minimum supported Rust version
 
-pathbin v0.1.0 supports Rust 1.85 and newer.
+pathbin v0.1.1 supports Rust 1.85 and newer.
 
 The reproducible development environment pins Rust 1.85.0. Run project commands through Nix:
 
@@ -24,18 +24,18 @@ nix develop --command cargo build
 
 ## Stability
 
-v0.1.0 is an early, pre-1.0 release. Command behavior, human-readable output
+v0.1.1 is an early, pre-1.0 release. Command behavior, human-readable output
 formats, and exit-code semantics may change in breaking ways before 1.0.
 Scripts should pin the pathbin version and verify behavior when upgrading.
 
 ## Platform support
 
-pathbin v0.1.0 officially supports:
+pathbin v0.1.1 officially supports:
 
 - Linux
 - macOS
 
-Windows support is experimental in v0.1.0. Other operating systems are
+Windows support is experimental in v0.1.1. Other operating systems are
 untested and not officially supported.
 
 On Windows, pathbin currently:
