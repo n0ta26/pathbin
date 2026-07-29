@@ -37,6 +37,15 @@ jobs:
             exit 1
           fi
 
+          git fetch --no-tags origin \
+            "+refs/heads/main:refs/remotes/origin/main"
+          tagged_commit="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          if ! git merge-base --is-ancestor \
+            "$tagged_commit" refs/remotes/origin/main; then
+            echo "::error::${GITHUB_REF_NAME} must point to a commit on main"
+            exit 1
+          fi
+
           package_version="$(awk -F '"' '/^version = "/ { print $2; exit }' Cargo.toml)"
           if [[ "$GITHUB_REF_NAME" != "v${package_version}" ]]; then
             echo "::error::Tag ${GITHUB_REF_NAME} does not match Cargo package version ${package_version}"
