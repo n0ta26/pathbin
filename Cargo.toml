@@ -2,6 +2,7 @@
 name = "pathbin"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "Inspect executable commands available through PATH"
 license = "MIT"
 readme = "README.md"

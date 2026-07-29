@@ -53,10 +53,10 @@ fn list_binaries(scan: &ScanResult) -> CommandResult {
 }
 
 fn where_command(scan: &ScanResult, command_name: &str) -> CommandResult {
-    if let Some(matches) = scan.command_matches(command_name)
-        && let Some(first) = matches.first()
-    {
-        return CommandResult::success(vec![first.path().display().to_string()]);
+    if let Some(matches) = scan.command_matches(command_name) {
+        if let Some(first) = matches.first() {
+            return CommandResult::success(vec![first.path().display().to_string()]);
+        }
     }
 
     command_not_found(command_name)
