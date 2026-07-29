@@ -38,3 +38,17 @@ tests/cli_contract.rs
 tests/path_edge_cases.rs
 tests/path_precedence.rs
 ```
+
+## Publish dry run
+
+On 2026-07-30, from a clean Git working tree, the following command completed
+successfully with Rust and Cargo 1.85.0:
+
+```console
+nix develop --command cargo publish --dry-run
+```
+
+Cargo packaged the 15 reviewed files, compiled the packaged crate
+successfully, and stopped before upload as required by dry-run mode. The only
+warning was the expected `aborting upload due to dry run`; there were no
+package metadata, content, build, or verification warnings.
