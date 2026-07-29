@@ -1,15 +1,16 @@
 use std::collections::BTreeMap;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct BinaryEntry {
-    name: String,
+    name: OsString,
     path: PathBuf,
     path_index: usize,
 }
 
 impl BinaryEntry {
-    pub(crate) fn new(name: String, path: PathBuf, path_index: usize) -> Self {
+    pub(crate) fn new(name: OsString, path: PathBuf, path_index: usize) -> Self {
         Self {
             name,
             path,
@@ -17,7 +18,7 @@ impl BinaryEntry {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &OsStr {
         &self.name
     }
 
@@ -40,7 +41,7 @@ pub struct ScanResult {
     pub(crate) unreadable_entries: Vec<PathBuf>,
     pub(crate) broken_symlinks: Vec<PathBuf>,
     pub(crate) binaries: Vec<BinaryEntry>,
-    pub(crate) by_name: BTreeMap<String, Vec<BinaryEntry>>,
+    pub(crate) by_name: BTreeMap<OsString, Vec<BinaryEntry>>,
 }
 
 impl ScanResult {
@@ -94,14 +95,14 @@ impl ScanResult {
             .sum()
     }
 
-    pub fn command_matches(&self, command: &str) -> Option<&[BinaryEntry]> {
+    pub fn command_matches(&self, command: &OsStr) -> Option<&[BinaryEntry]> {
         self.by_name.get(command).map(Vec::as_slice)
     }
 
-    pub fn duplicate_groups(&self) -> impl Iterator<Item = (&str, &[BinaryEntry])> {
+    pub fn duplicate_groups(&self) -> impl Iterator<Item = (&OsStr, &[BinaryEntry])> {
         self.by_name.iter().filter_map(|(name, entries)| {
             if entries.len() > 1 {
-                Some((name.as_str(), entries.as_slice()))
+                Some((name.as_os_str(), entries.as_slice()))
             } else {
                 None
             }
@@ -118,9 +119,47 @@ impl ScanResult {
 
         for entry in &self.binaries {
             self.by_name
-                .entry(entry.name().to_string())
+                .entry(entry.name().to_os_string())
                 .or_default()
                 .push(entry.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn non_utf8_command_names_remain_distinct_in_the_index() {
+        use super::{BinaryEntry, ScanResult};
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        use std::path::PathBuf;
+
+        let first = OsStr::from_bytes(b"tool-\xfe");
+        let second = OsStr::from_bytes(b"tool-\xff");
+        let mut scan = ScanResult::default();
+        scan.binaries.push(BinaryEntry::new(
+            first.to_os_string(),
+            PathBuf::from("first"),
+            0,
+        ));
+        scan.binaries.push(BinaryEntry::new(
+            second.to_os_string(),
+            PathBuf::from("second"),
+            0,
+        ));
+
+        scan.build_name_index();
+
+        assert_eq!(scan.unique_command_count(), 2);
+        assert_eq!(
+            scan.command_matches(first).map(|entries| entries.len()),
+            Some(1)
+        );
+        assert_eq!(
+            scan.command_matches(second).map(|entries| entries.len()),
+            Some(1)
+        );
     }
 }

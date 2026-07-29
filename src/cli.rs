@@ -1,8 +1,10 @@
+use std::ffi::OsString;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     List,
-    Where { name: String },
-    All { name: String },
+    Where { name: OsString },
+    All { name: OsString },
     Shadowed,
     Duplicates,
     Broken,
@@ -19,7 +21,7 @@ pub enum CliAction {
     },
 }
 
-pub fn parse_action(args: &[String]) -> CliAction {
+pub fn parse_action(args: &[OsString]) -> CliAction {
     if args.is_empty() {
         return CliAction::ShowUsage {
             message: None,
@@ -27,8 +29,8 @@ pub fn parse_action(args: &[String]) -> CliAction {
         };
     }
 
-    let command = args[0].as_str();
-    if matches!(command, "-h" | "--help" | "help") {
+    let command = args[0].to_str();
+    if matches!(command, Some("-h" | "--help" | "help")) {
         return CliAction::ShowUsage {
             message: None,
             exit_code: 0,
@@ -36,16 +38,19 @@ pub fn parse_action(args: &[String]) -> CliAction {
     }
 
     match command {
-        "list" => expect_no_extra_args(args, Command::List),
-        "where" => expect_one_value_arg(args, |name| Command::Where { name }),
-        "all" => expect_one_value_arg(args, |name| Command::All { name }),
-        "shadowed" => expect_no_extra_args(args, Command::Shadowed),
-        "duplicates" => expect_no_extra_args(args, Command::Duplicates),
-        "broken" => expect_no_extra_args(args, Command::Broken),
-        "stats" => expect_no_extra_args(args, Command::Stats),
-        "doctor" => expect_no_extra_args(args, Command::Doctor),
+        Some("list") => expect_no_extra_args(args, Command::List),
+        Some("where") => expect_one_value_arg(args, |name| Command::Where { name }),
+        Some("all") => expect_one_value_arg(args, |name| Command::All { name }),
+        Some("shadowed") => expect_no_extra_args(args, Command::Shadowed),
+        Some("duplicates") => expect_no_extra_args(args, Command::Duplicates),
+        Some("broken") => expect_no_extra_args(args, Command::Broken),
+        Some("stats") => expect_no_extra_args(args, Command::Stats),
+        Some("doctor") => expect_no_extra_args(args, Command::Doctor),
         _ => CliAction::ShowUsage {
-            message: Some(format!("Unknown command: {command}")),
+            message: Some(format!(
+                "Unknown command: {}",
+                crate::output::render_os(&args[0])
+            )),
             exit_code: 1,
         },
     }
@@ -67,7 +72,7 @@ pub fn usage_lines() -> &'static [&'static str] {
     ]
 }
 
-fn expect_no_extra_args(args: &[String], command: Command) -> CliAction {
+fn expect_no_extra_args(args: &[OsString], command: Command) -> CliAction {
     if args.len() == 1 {
         CliAction::Execute(command)
     } else {
@@ -75,9 +80,9 @@ fn expect_no_extra_args(args: &[String], command: Command) -> CliAction {
     }
 }
 
-fn expect_one_value_arg<F>(args: &[String], constructor: F) -> CliAction
+fn expect_one_value_arg<F>(args: &[OsString], constructor: F) -> CliAction
 where
-    F: FnOnce(String) -> Command,
+    F: FnOnce(OsString) -> Command,
 {
     if args.len() == 2 {
         CliAction::Execute(constructor(args[1].clone()))
