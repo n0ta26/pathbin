@@ -201,3 +201,27 @@ Doctor summary: 1 issue category/categories detected.\n",
         "",
     );
 }
+
+#[test]
+fn doctor_exits_zero_for_informational_duplicate_only() {
+    let fixture = Fixture::new();
+    let second_bin = fixture.root.join("second-bin");
+    fs::create_dir(&second_bin).expect("create second PATH directory");
+    let second_tool = second_bin.join("tool");
+    fs::write(&second_tool, "#!/bin/sh\n").expect("create duplicate executable");
+    let mut permissions = fs::metadata(&second_tool)
+        .expect("read duplicate permissions")
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&second_tool, permissions).expect("mark duplicate executable");
+    let path =
+        std::env::join_paths([fixture.bin.as_path(), second_bin.as_path()]).expect("join PATH");
+
+    assert_output(
+        &run_pathbin(Some(path.as_os_str()), &fixture.root, &["doctor"]),
+        0,
+        "[INFO] Found 1 duplicate command name(s).\n\
+Doctor summary: 1 issue category/categories detected.\n",
+        "",
+    );
+}
