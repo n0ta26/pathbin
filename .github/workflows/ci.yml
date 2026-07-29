@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -38,3 +42,20 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release
+
+  required:
+    name: Required CI
+    if: always()
+    needs:
+      - quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require every quality job to pass
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          if [[ "$QUALITY_RESULT" != "success" ]]; then
+            echo "::error::One or more quality jobs did not pass"
+            exit 1
+          fi
