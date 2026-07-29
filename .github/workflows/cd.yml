@@ -31,8 +31,8 @@ jobs:
             exit 1
           fi
 
-          tag_type="$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")"
-          if [[ "$tag_type" != "tag" ]]; then
+          if ! git ls-remote --exit-code origin \
+            "refs/tags/${GITHUB_REF_NAME}^{}" > /dev/null; then
             echo "::error::${GITHUB_REF_NAME} must be an annotated or signed tag"
             exit 1
           fi
