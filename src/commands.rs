@@ -171,13 +171,16 @@ fn stats(scan: &ScanResult) -> CommandResult {
 fn doctor(scan: &ScanResult) -> CommandResult {
     let mut lines = Vec::new();
     let mut findings = 0usize;
+    let mut has_warning_or_error = false;
 
     if scan.path_entries_total() == 0 {
         findings += 1;
+        has_warning_or_error = true;
         lines.push("[ERROR] PATH is empty or not set.".to_string());
     }
     if scan.empty_path_entries() > 0 {
         findings += 1;
+        has_warning_or_error = true;
         lines.push(format!(
             "[WARN] PATH contains {} empty entry/entries (current directory lookup).",
             scan.empty_path_entries()
@@ -185,6 +188,7 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     }
     if !scan.missing_entries().is_empty() {
         findings += 1;
+        has_warning_or_error = true;
         lines.push(format!(
             "[WARN] PATH contains {} missing directory/directories.",
             scan.missing_entries().len()
@@ -192,6 +196,7 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     }
     if !scan.non_dir_entries().is_empty() {
         findings += 1;
+        has_warning_or_error = true;
         lines.push(format!(
             "[WARN] PATH contains {} non-directory entry/entries.",
             scan.non_dir_entries().len()
@@ -199,6 +204,7 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     }
     if !scan.unreadable_entries().is_empty() {
         findings += 1;
+        has_warning_or_error = true;
         lines.push(format!(
             "[WARN] PATH contains {} unreadable directory/directories.",
             scan.unreadable_entries().len()
@@ -206,6 +212,7 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     }
     if !scan.broken_symlinks().is_empty() {
         findings += 1;
+        has_warning_or_error = true;
         lines.push(format!(
             "[WARN] Found {} broken symlink(s) in PATH directories.",
             scan.broken_symlinks().len()
@@ -230,7 +237,7 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     CommandResult {
         stdout_lines: lines,
         stderr_lines: Vec::new(),
-        exit_code: 1,
+        exit_code: i32::from(has_warning_or_error),
     }
 }
 
