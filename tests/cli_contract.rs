@@ -179,3 +179,25 @@ fn lookup_failures_use_stderr_and_exit_one() {
         "Command 'missing' was not found in PATH.\n",
     );
 }
+
+#[test]
+fn doctor_exits_one_for_warnings_and_errors() {
+    let fixture = Fixture::new();
+
+    assert_output(
+        &run_pathbin(None, &fixture.root, &["doctor"]),
+        1,
+        "[ERROR] PATH is empty or not set.\n\
+Doctor summary: 1 issue category/categories detected.\n",
+        "",
+    );
+
+    let missing = fixture.root.join("missing");
+    assert_output(
+        &run_pathbin(Some(missing.as_os_str()), &fixture.root, &["doctor"]),
+        1,
+        "[WARN] PATH contains 1 missing directory/directories.\n\
+Doctor summary: 1 issue category/categories detected.\n",
+        "",
+    );
+}

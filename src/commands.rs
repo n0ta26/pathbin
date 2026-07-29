@@ -221,13 +221,17 @@ fn doctor(scan: &ScanResult) -> CommandResult {
 
     if findings == 0 {
         lines.push("No obvious PATH problems detected.".to_string());
-    } else {
-        lines.push(format!(
-            "Doctor summary: {findings} issue category/categories detected."
-        ));
+        return CommandResult::success(lines);
     }
 
-    CommandResult::success(lines)
+    lines.push(format!(
+        "Doctor summary: {findings} issue category/categories detected."
+    ));
+    CommandResult {
+        stdout_lines: lines,
+        stderr_lines: Vec::new(),
+        exit_code: 1,
+    }
 }
 
 fn command_not_found(command_name: &str) -> CommandResult {
