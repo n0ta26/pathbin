@@ -22,6 +22,16 @@ The reproducible development environment pins Rust 1.85.0. Run project commands 
 nix develop --command cargo build
 ```
 
+## Platform support
+
+pathbin v0.1.0 officially supports:
+
+- Linux
+- macOS
+
+Windows support is experimental in v0.1.0. Other operating systems are
+untested and not officially supported.
+
 ## Features
 - List executable binaries in `PATH`
 - Show where a command is located
