@@ -2,5 +2,11 @@
 name = "pathbin"
 version = "0.1.0"
 edition = "2024"
+description = "Inspect executable commands available through PATH"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/n0ta26/pathbin"
+keywords = ["path", "cli", "executable", "command", "diagnostics"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
