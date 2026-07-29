@@ -3,6 +3,16 @@
 
 It extracts executable binaries from `PATH` and helps you understand command resolution, duplicates, shadowed binaries, and broken paths.
 
+## Minimum supported Rust version
+
+pathbin v0.1.0 supports Rust 1.85 and newer.
+
+The reproducible development environment pins Rust 1.85.0. Run project commands through Nix:
+
+```console
+nix develop --command cargo build
+```
+
 ## Features
 - List executable binaries in `PATH`
 - Show where a command is located
