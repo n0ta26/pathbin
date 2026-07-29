@@ -19,6 +19,7 @@
         };
         rustToolchain = pkgs.rust-bin.stable."1.85.0".default.override {
           extensions = [ "clippy" "rustfmt" ];
+          targets = [ "x86_64-pc-windows-gnu" ];
         };
       in
       {
