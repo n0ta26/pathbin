@@ -103,6 +103,13 @@ Show PATH statistics.
 Diagnose PATH problems.
 `pathbin doctor`
 
+### Doctor exit codes
+
+`pathbin doctor` writes its diagnostic report to standard output. It exits
+with status 0 when no problems are detected and status 1 when it reports any
+warning or error. This makes the command suitable for both interactive use
+and automated checks.
+
 ## Concept
 pathbin scans each directory listed in the PATH environment variable in order.
 
