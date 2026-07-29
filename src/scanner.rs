@@ -96,6 +96,11 @@ fn is_executable(metadata: &fs::Metadata, _path: &Path) -> bool {
 
 #[cfg(windows)]
 fn is_executable(_metadata: &fs::Metadata, path: &Path) -> bool {
+    has_windows_executable_extension(path)
+}
+
+#[cfg(any(windows, test))]
+fn has_windows_executable_extension(path: &Path) -> bool {
     let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
         return false;
     };
@@ -109,4 +114,24 @@ fn is_executable(_metadata: &fs::Metadata, path: &Path) -> bool {
 #[cfg(not(any(unix, windows)))]
 fn is_executable(metadata: &fs::Metadata, _path: &Path) -> bool {
     metadata.is_file()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_windows_executable_extension;
+    use std::path::Path;
+
+    #[test]
+    fn windows_executable_extensions_are_case_insensitive() {
+        for path in ["tool.exe", "tool.CMD", "tool.Bat", "tool.cOm", "tool.PS1"] {
+            assert!(has_windows_executable_extension(Path::new(path)), "{path}");
+        }
+    }
+
+    #[test]
+    fn windows_executable_detection_rejects_unknown_or_missing_extensions() {
+        for path in ["tool", "tool.sh", "tool.txt", "tool.exe.backup"] {
+            assert!(!has_windows_executable_extension(Path::new(path)), "{path}");
+        }
+    }
 }

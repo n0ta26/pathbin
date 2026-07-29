@@ -38,6 +38,18 @@ pathbin v0.1.0 officially supports:
 Windows support is experimental in v0.1.0. Other operating systems are
 untested and not officially supported.
 
+On Windows, pathbin currently:
+
+- recognizes `.exe`, `.cmd`, `.bat`, `.com`, and `.ps1` files regardless of
+  extension case;
+- ignores the user's `PATHEXT` value;
+- requires lookup names to include the filename extension; and
+- groups command names case-sensitively, unlike normal Windows command
+  resolution.
+
+The Windows code is compile-checked for `x86_64-pc-windows-gnu`, but the
+release is not yet covered by native Windows integration tests.
+
 ## Known limitations
 
 pathbin inspects filesystem entries in `PATH`; it does not fully emulate a
