@@ -14,7 +14,7 @@ fn main() {
 }
 
 fn run() -> i32 {
-    let args: Vec<String> = env::args().skip(1).collect();
+    let args: Vec<_> = env::args_os().skip(1).collect();
 
     let command = match cli::parse_action(&args) {
         CliAction::Execute(command) => command,

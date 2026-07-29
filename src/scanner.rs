@@ -69,7 +69,7 @@ pub fn scan_path() -> ScanResult {
             };
 
             scan.binaries.push(BinaryEntry::new(
-                file_name.to_string_lossy().to_string(),
+                file_name.to_os_string(),
                 candidate,
                 path_index,
             ));

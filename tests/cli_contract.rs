@@ -2,6 +2,7 @@
 
 use std::ffi::OsStr;
 use std::fs;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -39,10 +40,7 @@ impl Fixture {
         let bin = root.join("bin");
         fs::create_dir_all(&bin).expect("create PATH directory");
         let tool = bin.join("tool");
-        fs::write(&tool, "#!/bin/sh\n").expect("create executable");
-        let mut permissions = fs::metadata(&tool).expect("read permissions").permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&tool, permissions).expect("mark executable");
+        create_executable(&tool);
         Self { root, bin, tool }
     }
 
@@ -57,6 +55,13 @@ impl Drop for Fixture {
     }
 }
 
+fn create_executable(path: &Path) {
+    fs::write(path, "#!/bin/sh\n").expect("create executable");
+    let mut permissions = fs::metadata(path).expect("read permissions").permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("mark executable");
+}
+
 fn run_pathbin(path: Option<&OsStr>, current_dir: &Path, arguments: &[&str]) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_pathbin"));
     command.args(arguments).current_dir(current_dir);
@@ -69,6 +74,16 @@ fn run_pathbin(path: Option<&OsStr>, current_dir: &Path, arguments: &[&str]) -> 
         }
     }
     command.output().expect("run pathbin")
+}
+
+#[cfg(target_os = "linux")]
+fn run_pathbin_os(path: &OsStr, current_dir: &Path, arguments: &[&OsStr]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_pathbin"))
+        .args(arguments)
+        .current_dir(current_dir)
+        .env("PATH", path)
+        .output()
+        .expect("run pathbin with OS-native arguments")
 }
 
 fn assert_output(output: &Output, code: i32, stdout: &str, stderr: &str) {
@@ -223,5 +238,96 @@ fn doctor_exits_zero_for_informational_duplicate_only() {
         "[INFO] Found 1 duplicate command name(s).\n\
 Doctor summary: 1 issue category/categories detected.\n",
         "",
+    );
+}
+
+#[test]
+fn escapes_control_characters_from_filesystem_and_arguments() {
+    let fixture = Fixture::new();
+    let untrusted_name = OsStr::from_bytes(b"bad\n\x1b[31m");
+    create_executable(&fixture.bin.join(untrusted_name));
+
+    let list = fixture.run(&["list"]);
+    assert_eq!(list.status.code(), Some(0));
+    assert!(list.stderr.is_empty());
+    assert!(!list.stdout.contains(&0x1b));
+    assert_eq!(list.stdout.iter().filter(|byte| **byte == b'\n').count(), 2);
+    let list_stdout = String::from_utf8(list.stdout).expect("escaped list output is UTF-8");
+    assert!(list_stdout.contains("bad\\n\\u{1b}[31m\t"));
+
+    let lookup = fixture.run(&["where", "missing\n\x1b[31m"]);
+    assert_eq!(lookup.status.code(), Some(1));
+    assert!(lookup.stdout.is_empty());
+    assert!(!lookup.stderr.contains(&0x1b));
+    assert_eq!(
+        String::from_utf8(lookup.stderr).expect("escaped lookup error is UTF-8"),
+        "Command 'missing\\n\\u{1b}[31m' was not found in PATH.\n"
+    );
+
+    let unknown = fixture.run(&["unknown\n\x1b[31m"]);
+    assert_eq!(unknown.status.code(), Some(1));
+    assert!(!unknown.stderr.contains(&0x1b));
+    assert!(
+        String::from_utf8(unknown.stderr)
+            .expect("escaped unknown-command error is UTF-8")
+            .starts_with("Unknown command: unknown\\n\\u{1b}[31m\n")
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn preserves_and_looks_up_distinct_non_utf8_names() {
+    let fixture = Fixture::new();
+    let first_name = OsStr::from_bytes(b"tool-\xfe");
+    let second_name = OsStr::from_bytes(b"tool-\xff");
+    let first_path = fixture.bin.join(first_name);
+    let second_path = fixture.bin.join(second_name);
+    create_executable(&first_path);
+    create_executable(&second_path);
+
+    let list = fixture.run(&["list"]);
+    assert_eq!(list.status.code(), Some(0));
+    let list_stdout = String::from_utf8(list.stdout).expect("escaped list output is UTF-8");
+    assert!(list_stdout.contains("tool-\\xFE\t"));
+    assert!(list_stdout.contains("tool-\\xFF\t"));
+    assert!(!list_stdout.contains('\u{fffd}'));
+    let rendered_path_prefix = format!("{}/tool-", fixture.bin.display());
+
+    let first_lookup = run_pathbin_os(
+        fixture.bin.as_os_str(),
+        &fixture.root,
+        &[OsStr::new("where"), first_name],
+    );
+    assert_output(
+        &first_lookup,
+        0,
+        &format!("{rendered_path_prefix}\\xFE\n"),
+        "",
+    );
+
+    let second_lookup = run_pathbin_os(
+        fixture.bin.as_os_str(),
+        &fixture.root,
+        &[OsStr::new("where"), second_name],
+    );
+    assert_output(
+        &second_lookup,
+        0,
+        &format!("{rendered_path_prefix}\\xFF\n"),
+        "",
+    );
+
+    assert_output(
+        &fixture.run(&["duplicates"]),
+        0,
+        "No duplicate command names found.\n",
+        "",
+    );
+    let stats = fixture.run(&["stats"]);
+    assert_eq!(stats.status.code(), Some(0));
+    assert!(
+        String::from_utf8(stats.stdout)
+            .expect("stats output is UTF-8")
+            .contains("Unique command names: 3\n")
     );
 }

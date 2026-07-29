@@ -1,5 +1,7 @@
 use crate::cli::Command;
 use crate::model::ScanResult;
+use crate::output;
+use std::ffi::OsStr;
 
 #[derive(Debug, Default)]
 pub struct CommandResult {
@@ -47,29 +49,35 @@ fn list_binaries(scan: &ScanResult) -> CommandResult {
     let lines = scan
         .binaries()
         .iter()
-        .map(|entry| format!("{}\t{}", entry.name(), entry.path().display()))
+        .map(|entry| {
+            format!(
+                "{}\t{}",
+                output::render_os(entry.name()),
+                output::render_path(entry.path())
+            )
+        })
         .collect();
     CommandResult::success(lines)
 }
 
-fn where_command(scan: &ScanResult, command_name: &str) -> CommandResult {
+fn where_command(scan: &ScanResult, command_name: &OsStr) -> CommandResult {
     if let Some(matches) = scan.command_matches(command_name) {
         if let Some(first) = matches.first() {
-            return CommandResult::success(vec![first.path().display().to_string()]);
+            return CommandResult::success(vec![output::render_path(first.path())]);
         }
     }
 
     command_not_found(command_name)
 }
 
-fn all_commands(scan: &ScanResult, command_name: &str) -> CommandResult {
+fn all_commands(scan: &ScanResult, command_name: &OsStr) -> CommandResult {
     if let Some(matches) = scan.command_matches(command_name) {
         let lines = matches
             .iter()
             .enumerate()
             .map(|(index, entry)| {
                 let status = if index == 0 { "active" } else { "shadowed" };
-                format!("[{status}] {}", entry.path().display())
+                format!("[{status}] {}", output::render_path(entry.path()))
             })
             .collect();
         return CommandResult::success(lines);
@@ -82,9 +90,9 @@ fn shadowed(scan: &ScanResult) -> CommandResult {
     let mut lines = Vec::new();
 
     for (name, entries) in scan.duplicate_groups() {
-        lines.push(name.to_string());
+        lines.push(output::render_os(name));
         for entry in entries.iter().skip(1) {
-            lines.push(format!("  {}", entry.path().display()));
+            lines.push(format!("  {}", output::render_path(entry.path())));
         }
     }
 
@@ -99,7 +107,7 @@ fn duplicates(scan: &ScanResult) -> CommandResult {
     let mut lines = Vec::new();
 
     for (name, entries) in scan.duplicate_groups() {
-        lines.push(format!("{name}\t{}", entries.len()));
+        lines.push(format!("{}\t{}", output::render_os(name), entries.len()));
     }
 
     if lines.is_empty() {
@@ -115,28 +123,28 @@ fn broken(scan: &ScanResult) -> CommandResult {
     if !scan.missing_entries().is_empty() {
         lines.push("Missing PATH entries:".to_string());
         for entry in scan.missing_entries() {
-            lines.push(format!("  {}", entry.display()));
+            lines.push(format!("  {}", output::render_path(entry)));
         }
     }
 
     if !scan.non_dir_entries().is_empty() {
         lines.push("Non-directory PATH entries:".to_string());
         for entry in scan.non_dir_entries() {
-            lines.push(format!("  {}", entry.display()));
+            lines.push(format!("  {}", output::render_path(entry)));
         }
     }
 
     if !scan.unreadable_entries().is_empty() {
         lines.push("Unreadable PATH directories:".to_string());
         for entry in scan.unreadable_entries() {
-            lines.push(format!("  {}", entry.display()));
+            lines.push(format!("  {}", output::render_path(entry)));
         }
     }
 
     if !scan.broken_symlinks().is_empty() {
         lines.push("Broken symlinks:".to_string());
         for link in scan.broken_symlinks() {
-            lines.push(format!("  {}", link.display()));
+            lines.push(format!("  {}", output::render_path(link)));
         }
     }
 
@@ -241,6 +249,9 @@ fn doctor(scan: &ScanResult) -> CommandResult {
     }
 }
 
-fn command_not_found(command_name: &str) -> CommandResult {
-    CommandResult::failure(format!("Command '{command_name}' was not found in PATH."))
+fn command_not_found(command_name: &OsStr) -> CommandResult {
+    CommandResult::failure(format!(
+        "Command '{}' was not found in PATH.",
+        output::render_os(command_name)
+    ))
 }

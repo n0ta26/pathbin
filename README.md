@@ -67,6 +67,14 @@ shell's command-resolution rules.
 - Output describes the filesystem at scan time and can become stale if files
   or `PATH` change while the command is running.
 
+## Output safety
+
+Control characters in command names and paths are rendered as visible escape
+sequences instead of being written directly to a terminal or log. On Unix
+filesystems that allow non-UTF-8 filenames, raw filename bytes are preserved
+for lookup and grouping and are rendered as `\xNN` byte escapes. Ordinary
+printable names and paths are unchanged.
+
 ## Features
 - List executable binaries in `PATH`
 - Show where a command is located
