@@ -135,3 +135,7 @@ pathbin scans each directory listed in the PATH environment variable in order.
 
 For each entry, it checks executable files and groups them by command name.
 This makes it possible to detect which binary is actually executed first, which binaries are shadowed, and whether there are duplicate or broken entries.
+
+Repeated directories still count as separate `PATH` entries in statistics, but
+an identical executable path is reported only once. Its first occurrence
+determines command precedence.
