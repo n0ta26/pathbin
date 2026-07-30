@@ -1,4 +1,5 @@
 use crate::model::{BinaryEntry, ScanResult};
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,7 @@ pub fn scan_path() -> ScanResult {
         .map(|value| env::split_paths(value).collect())
         .unwrap_or_default();
     scan.path_entries_total = path_entries.len();
+    let mut seen_binary_paths = HashSet::new();
 
     for (path_index, raw_entry) in path_entries.into_iter().enumerate() {
         let entry = normalize_path_entry(&raw_entry);
@@ -61,6 +63,10 @@ pub fn scan_path() -> ScanResult {
             };
 
             if !metadata.is_file() || !is_executable(&metadata, &candidate) {
+                continue;
+            }
+
+            if !seen_binary_paths.insert(candidate.clone()) {
                 continue;
             }
 

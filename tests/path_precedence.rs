@@ -100,7 +100,7 @@ fn path_order_selects_active_and_classifies_duplicates() {
 }
 
 #[test]
-fn repeated_path_directory_preserves_precedence_and_counts_duplicate() {
+fn repeated_path_directory_reports_each_binary_once() {
     let temp = TempDir::new("repeated-directory");
     let bin_dir = temp.child("bin");
     let tool = create_executable(&bin_dir, "tool");
@@ -111,12 +111,37 @@ fn repeated_path_directory_preserves_precedence_and_counts_duplicate() {
         &format!("{}\n", tool.display()),
     );
     assert_success(
-        &run_pathbin(&path, &["all", "tool"]),
-        &format!(
-            "[active] {}\n[shadowed] {}\n",
-            tool.display(),
-            tool.display()
-        ),
+        &run_pathbin(&path, &["list"]),
+        &format!("tool\t{}\n", tool.display()),
     );
-    assert_success(&run_pathbin(&path, &["duplicates"]), "tool\t2\n");
+    assert_success(
+        &run_pathbin(&path, &["all", "tool"]),
+        &format!("[active] {}\n", tool.display()),
+    );
+    assert_success(
+        &run_pathbin(&path, &["duplicates"]),
+        "No duplicate command names found.\n",
+    );
+    assert_success(
+        &run_pathbin(&path, &["shadowed"]),
+        "No shadowed binaries found.\n",
+    );
+    assert_success(
+        &run_pathbin(&path, &["stats"]),
+        "PATH entries: 2\n\
+         Existing directories: 2\n\
+         Missing PATH entries: 0\n\
+         Non-directory entries: 0\n\
+         Unreadable PATH directories: 0\n\
+         Empty PATH entries: 0\n\
+         Executable binaries: 1\n\
+         Unique command names: 1\n\
+         Duplicate command names: 0\n\
+         Shadowed binaries: 0\n\
+         Broken symlinks: 0\n",
+    );
+    assert_success(
+        &run_pathbin(&path, &["doctor"]),
+        "No obvious PATH problems detected.\n",
+    );
 }
