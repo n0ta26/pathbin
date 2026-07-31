@@ -163,25 +163,13 @@ fn help_and_invalid_invocations_have_explicit_streams_and_exit_codes() {
         &format!("Unknown command: unknown\n{USAGE}"),
     );
     assert_output(
-        &fixture.run(&["list", "extra"]),
-        1,
-        "",
-        &format!("Invalid arguments.\n{USAGE}"),
-    );
-    assert_output(
-        &fixture.run(&["where"]),
-        1,
-        "",
-        &format!("Invalid arguments.\n{USAGE}"),
-    );
-    assert_output(
-        &fixture.run(&["all"]),
-        1,
-        "",
-        &format!("Invalid arguments.\n{USAGE}"),
-    );
-    assert_output(
         &fixture.run(&["--homebrew", "--homebrew", "list"]),
+        1,
+        "",
+        &format!("Invalid arguments.\n{USAGE}"),
+    );
+    assert_output(
+        &fixture.run(&["list", "--homebrew", "--homebrew"]),
         1,
         "",
         &format!("Invalid arguments.\n{USAGE}"),
@@ -192,6 +180,38 @@ fn help_and_invalid_invocations_have_explicit_streams_and_exit_codes() {
         "",
         &format!("Invalid arguments.\n{USAGE}"),
     );
+    assert_output(
+        &fixture.run(&["--homebrew", "all"]),
+        1,
+        "",
+        &format!("Invalid arguments.\n{USAGE}"),
+    );
+}
+
+#[test]
+fn every_public_subcommand_rejects_invalid_arity() {
+    let fixture = Fixture::new();
+    let invalid_invocations: &[&[&str]] = &[
+        &["list", "extra"],
+        &["where"],
+        &["where", "tool", "extra"],
+        &["all"],
+        &["all", "tool", "extra"],
+        &["shadowed", "extra"],
+        &["duplicates", "extra"],
+        &["broken", "extra"],
+        &["stats", "extra"],
+        &["doctor", "extra"],
+    ];
+
+    for arguments in invalid_invocations {
+        assert_output(
+            &fixture.run(arguments),
+            1,
+            "",
+            &format!("Invalid arguments.\n{USAGE}"),
+        );
+    }
 }
 
 #[test]
