@@ -11,11 +11,11 @@ This document records checks that depend on external release services.
 
 The crates.io API request for `pathbin` returned HTTP 404 with
 `crate 'pathbin' does not exist`. The project will therefore keep `pathbin` as
-its package and binary name for v0.1.0.
+its package and binary name for v0.1.2.
 
 ## Package contents
 
-The v0.1.0 package is restricted to the manifest and lockfile, license,
+The v0.1.2 package is restricted to the manifest and lockfile, license,
 README, Rust sources, and integration tests. Cargo also generates its
 normalized manifest and VCS metadata during packaging.
 
@@ -35,20 +35,21 @@ src/model.rs
 src/output.rs
 src/scanner.rs
 tests/cli_contract.rs
+tests/homebrew_source.rs
 tests/path_edge_cases.rs
 tests/path_precedence.rs
 ```
 
 ## Publish dry run
 
-On 2026-07-30, from a clean Git working tree, the following command completed
+On 2026-08-01, from a clean Git working tree, the following command completed
 successfully with Rust and Cargo 1.85.0:
 
 ```console
 nix develop --command cargo publish --dry-run
 ```
 
-Cargo packaged the 15 reviewed files, compiled the packaged crate
+Cargo packaged the 16 reviewed files, compiled the packaged crate
 successfully, and stopped before upload as required by dry-run mode. The only
 warning was the expected `aborting upload due to dry run`; there were no
 package metadata, content, build, or verification warnings.
