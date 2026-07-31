@@ -5,22 +5,52 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn scan_path() -> ScanResult {
-    let mut scan = ScanResult::default();
-
     let separator = if cfg!(windows) { ';' } else { ':' };
     let raw_path = env::var_os("PATH");
-
-    if let Some(raw_path_text) = raw_path.as_ref().map(|value| value.to_string_lossy()) {
-        scan.empty_path_entries = raw_path_text
-            .split(separator)
-            .filter(|part| part.is_empty())
-            .count();
-    }
+    let empty_path_entries = raw_path
+        .as_ref()
+        .map(|value| {
+            value
+                .to_string_lossy()
+                .split(separator)
+                .filter(|part| part.is_empty())
+                .count()
+        })
+        .unwrap_or_default();
 
     let path_entries: Vec<PathBuf> = raw_path
         .as_ref()
         .map(|value| env::split_paths(value).collect())
         .unwrap_or_default();
+    scan_entries(path_entries, empty_path_entries)
+}
+
+pub fn scan_homebrew() -> Result<ScanResult, String> {
+    if !cfg!(any(target_os = "macos", target_os = "linux")) {
+        return Err("Homebrew-only scanning is supported only on macOS and Linux.".to_string());
+    }
+
+    let prefix = env::var_os("HOMEBREW_PREFIX")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(default_homebrew_prefix)
+        .expect("supported Homebrew platforms have a default prefix");
+
+    if !prefix.is_absolute() {
+        return Err("HOMEBREW_PREFIX must be an absolute path.".to_string());
+    }
+
+    Ok(scan_entries(
+        vec![prefix.join("bin"), prefix.join("sbin")],
+        0,
+    ))
+}
+
+fn scan_entries(path_entries: Vec<PathBuf>, empty_path_entries: usize) -> ScanResult {
+    let mut scan = ScanResult {
+        empty_path_entries,
+        ..ScanResult::default()
+    };
     scan.path_entries_total = path_entries.len();
     let mut seen_binary_paths = HashSet::new();
 
@@ -86,6 +116,26 @@ pub fn scan_path() -> ScanResult {
     scan
 }
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn default_homebrew_prefix() -> Option<PathBuf> {
+    Some(PathBuf::from("/opt/homebrew"))
+}
+
+#[cfg(all(target_os = "macos", not(target_arch = "aarch64")))]
+fn default_homebrew_prefix() -> Option<PathBuf> {
+    Some(PathBuf::from("/usr/local"))
+}
+
+#[cfg(target_os = "linux")]
+fn default_homebrew_prefix() -> Option<PathBuf> {
+    Some(PathBuf::from("/home/linuxbrew/.linuxbrew"))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn default_homebrew_prefix() -> Option<PathBuf> {
+    None
+}
+
 fn normalize_path_entry(entry: &Path) -> PathBuf {
     if entry.as_os_str().is_empty() {
         env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
@@ -124,7 +174,7 @@ fn is_executable(metadata: &fs::Metadata, _path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::has_windows_executable_extension;
+    use super::{default_homebrew_prefix, has_windows_executable_extension};
     use std::path::Path;
 
     #[test]
@@ -139,5 +189,32 @@ mod tests {
         for path in ["tool", "tool.sh", "tool.txt", "tool.exe.backup"] {
             assert!(!has_windows_executable_extension(Path::new(path)), "{path}");
         }
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn uses_the_apple_silicon_homebrew_prefix() {
+        assert_eq!(
+            default_homebrew_prefix().as_deref(),
+            Some(Path::new("/opt/homebrew"))
+        );
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", not(target_arch = "aarch64")))]
+    fn uses_the_intel_macos_homebrew_prefix() {
+        assert_eq!(
+            default_homebrew_prefix().as_deref(),
+            Some(Path::new("/usr/local"))
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn uses_the_linux_homebrew_prefix() {
+        assert_eq!(
+            default_homebrew_prefix().as_deref(),
+            Some(Path::new("/home/linuxbrew/.linuxbrew"))
+        );
     }
 }

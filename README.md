@@ -84,9 +84,14 @@ printable names and paths are unchanged.
 - Detect broken symlinks and missing `PATH` entries
 - Show basic statistics about binaries in `PATH`
 - Diagnose common `PATH` problems
+- Restrict any command to Homebrew's common executable directories
 
 ## Usage
-`pathbin <COMMAND>`
+`pathbin [OPTIONS] <COMMAND>`
+
+## Options
+
+- `--homebrew`  Scan only Homebrew's common `bin` and `sbin` directories
 
 ## Commands
 - list        List executable binaries in PATH
@@ -122,6 +127,32 @@ Show PATH statistics.
 
 Diagnose PATH problems.
 `pathbin doctor`
+
+Inspect only binaries exposed through Homebrew's common command directories.
+The option can appear before or after the subcommand.
+
+```console
+pathbin --homebrew list
+pathbin all python --homebrew
+```
+
+### Homebrew-only scans
+
+`--homebrew` replaces the ambient `PATH` with `<prefix>/bin` followed by
+`<prefix>/sbin` for the selected command. It works with every subcommand, so
+lookups, duplicate detection, statistics, and diagnostics all use the same
+Homebrew-only view. Existing output labels continue to call these scan entries
+`PATH` entries.
+
+The prefix comes from a non-empty `HOMEBREW_PREFIX` environment variable when
+one is exported by `brew shellenv`. Otherwise, pathbin uses Homebrew's official
+default for the current platform: `/opt/homebrew` on Apple Silicon macOS,
+`/usr/local` on Intel macOS, or `/home/linuxbrew/.linuxbrew` on Linux. A custom
+`HOMEBREW_PREFIX` must be an absolute path.
+
+Only the common `bin` and `sbin` directories are scanned. Executables from
+keg-only formulae are not included unless Homebrew has linked them into one of
+those directories.
 
 ### Doctor exit codes
 
