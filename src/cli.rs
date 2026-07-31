@@ -12,9 +12,18 @@ pub enum Command {
     Doctor,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanSource {
+    Path,
+    Homebrew,
+}
+
 #[derive(Debug, Clone)]
 pub enum CliAction {
-    Execute(Command),
+    Execute {
+        command: Command,
+        scan_source: ScanSource,
+    },
     ShowUsage {
         message: Option<String>,
         exit_code: i32,
@@ -22,14 +31,28 @@ pub enum CliAction {
 }
 
 pub fn parse_action(args: &[OsString]) -> CliAction {
-    if args.is_empty() {
+    let mut scan_source = ScanSource::Path;
+    let mut command_args = Vec::with_capacity(args.len());
+
+    for arg in args {
+        if arg == "--homebrew" {
+            if scan_source == ScanSource::Homebrew {
+                return invalid_arguments();
+            }
+            scan_source = ScanSource::Homebrew;
+        } else {
+            command_args.push(arg.clone());
+        }
+    }
+
+    if command_args.is_empty() {
         return CliAction::ShowUsage {
             message: None,
             exit_code: 1,
         };
     }
 
-    let command = args[0].to_str();
+    let command = command_args[0].to_str();
     if matches!(command, Some("-h" | "--help" | "help")) {
         return CliAction::ShowUsage {
             message: None,
@@ -37,28 +60,39 @@ pub fn parse_action(args: &[OsString]) -> CliAction {
         };
     }
 
-    match command {
-        Some("list") => expect_no_extra_args(args, Command::List),
-        Some("where") => expect_one_value_arg(args, |name| Command::Where { name }),
-        Some("all") => expect_one_value_arg(args, |name| Command::All { name }),
-        Some("shadowed") => expect_no_extra_args(args, Command::Shadowed),
-        Some("duplicates") => expect_no_extra_args(args, Command::Duplicates),
-        Some("broken") => expect_no_extra_args(args, Command::Broken),
-        Some("stats") => expect_no_extra_args(args, Command::Stats),
-        Some("doctor") => expect_no_extra_args(args, Command::Doctor),
+    let action = match command {
+        Some("list") => expect_no_extra_args(&command_args, Command::List),
+        Some("where") => expect_one_value_arg(&command_args, |name| Command::Where { name }),
+        Some("all") => expect_one_value_arg(&command_args, |name| Command::All { name }),
+        Some("shadowed") => expect_no_extra_args(&command_args, Command::Shadowed),
+        Some("duplicates") => expect_no_extra_args(&command_args, Command::Duplicates),
+        Some("broken") => expect_no_extra_args(&command_args, Command::Broken),
+        Some("stats") => expect_no_extra_args(&command_args, Command::Stats),
+        Some("doctor") => expect_no_extra_args(&command_args, Command::Doctor),
         _ => CliAction::ShowUsage {
             message: Some(format!(
                 "Unknown command: {}",
-                crate::output::render_os(&args[0])
+                crate::output::render_os(&command_args[0])
             )),
             exit_code: 1,
         },
+    };
+
+    match action {
+        CliAction::Execute { command, .. } => CliAction::Execute {
+            command,
+            scan_source,
+        },
+        action => action,
     }
 }
 
 pub fn usage_lines() -> &'static [&'static str] {
     &[
-        "Usage: pathbin <COMMAND>",
+        "Usage: pathbin [OPTIONS] <COMMAND>",
+        "",
+        "Options:",
+        "  --homebrew  Scan only Homebrew's common bin and sbin directories",
         "",
         "Commands:",
         "  list        List executable binaries in PATH",
@@ -74,7 +108,10 @@ pub fn usage_lines() -> &'static [&'static str] {
 
 fn expect_no_extra_args(args: &[OsString], command: Command) -> CliAction {
     if args.len() == 1 {
-        CliAction::Execute(command)
+        CliAction::Execute {
+            command,
+            scan_source: ScanSource::Path,
+        }
     } else {
         invalid_arguments()
     }
@@ -85,7 +122,10 @@ where
     F: FnOnce(OsString) -> Command,
 {
     if args.len() == 2 {
-        CliAction::Execute(constructor(args[1].clone()))
+        CliAction::Execute {
+            command: constructor(args[1].clone()),
+            scan_source: ScanSource::Path,
+        }
     } else {
         invalid_arguments()
     }

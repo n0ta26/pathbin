@@ -7,7 +7,7 @@ mod scanner;
 use std::env;
 use std::process;
 
-use cli::CliAction;
+use cli::{CliAction, ScanSource};
 
 fn main() {
     process::exit(run());
@@ -16,8 +16,11 @@ fn main() {
 fn run() -> i32 {
     let args: Vec<_> = env::args_os().skip(1).collect();
 
-    let command = match cli::parse_action(&args) {
-        CliAction::Execute(command) => command,
+    let (command, scan_source) = match cli::parse_action(&args) {
+        CliAction::Execute {
+            command,
+            scan_source,
+        } => (command, scan_source),
         CliAction::ShowUsage { message, exit_code } => {
             if let Some(line) = message {
                 output::write_stderr([line]);
@@ -27,7 +30,16 @@ fn run() -> i32 {
         }
     };
 
-    let scan = scanner::scan_path();
+    let scan = match scan_source {
+        ScanSource::Path => scanner::scan_path(),
+        ScanSource::Homebrew => match scanner::scan_homebrew() {
+            Ok(scan) => scan,
+            Err(message) => {
+                output::write_stderr([message]);
+                return 1;
+            }
+        },
+    };
     let result = commands::execute(&command, &scan);
 
     output::write_stdout(&result.stdout_lines);

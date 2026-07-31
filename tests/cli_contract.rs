@@ -9,7 +9,10 @@ use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const USAGE: &str = "\
-Usage: pathbin <COMMAND>
+Usage: pathbin [OPTIONS] <COMMAND>
+
+Options:
+  --homebrew  Scan only Homebrew's common bin and sbin directories
 
 Commands:
   list        List executable binaries in PATH
@@ -150,6 +153,8 @@ fn help_and_invalid_invocations_have_explicit_streams_and_exit_codes() {
     let fixture = Fixture::new();
 
     assert_output(&fixture.run(&["--help"]), 0, "", USAGE);
+    assert_output(&fixture.run(&["--homebrew", "--help"]), 0, "", USAGE);
+    assert_output(&fixture.run(&["--help", "--homebrew"]), 0, "", USAGE);
     assert_output(&fixture.run(&[]), 1, "", USAGE);
     assert_output(
         &fixture.run(&["unknown"]),
@@ -171,6 +176,18 @@ fn help_and_invalid_invocations_have_explicit_streams_and_exit_codes() {
     );
     assert_output(
         &fixture.run(&["all"]),
+        1,
+        "",
+        &format!("Invalid arguments.\n{USAGE}"),
+    );
+    assert_output(
+        &fixture.run(&["--homebrew", "--homebrew", "list"]),
+        1,
+        "",
+        &format!("Invalid arguments.\n{USAGE}"),
+    );
+    assert_output(
+        &fixture.run(&["where", "--homebrew"]),
         1,
         "",
         &format!("Invalid arguments.\n{USAGE}"),
