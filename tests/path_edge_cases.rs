@@ -57,6 +57,80 @@ fn assert_success(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).expect("UTF-8 stdout")
 }
 
+fn assert_output(output: &Output, code: i32, stdout: &str, stderr: &str) {
+    assert_eq!(output.status.code(), Some(code));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), stdout);
+    assert_eq!(String::from_utf8_lossy(&output.stderr), stderr);
+}
+
+#[test]
+fn ineligible_entries_are_excluded_from_command_results() {
+    let temp = TempDir::new("ineligible-entries");
+    let bin_dir = temp.child_dir("bin");
+    let non_executable = bin_dir.join("not-executable");
+    fs::write(&non_executable, "not executable\n").expect("create non-executable file");
+    let nested_dir = bin_dir.join("nested");
+    fs::create_dir(&nested_dir).expect("create nested directory");
+    let nested_tool = nested_dir.join("nested-tool");
+    fs::write(&nested_tool, "#!/bin/sh\n").expect("create nested executable");
+    fs::set_permissions(&nested_tool, fs::Permissions::from_mode(0o755))
+        .expect("mark nested file executable");
+    let path = OsString::from(bin_dir.as_os_str());
+
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["list"]),
+        0,
+        "No executable binaries found in PATH.\n",
+        "",
+    );
+
+    for command_name in ["not-executable", "nested-tool"] {
+        for command in ["where", "all"] {
+            assert_output(
+                &run_pathbin(Some(&path), &temp.path, &[command, command_name]),
+                1,
+                "",
+                &format!("Command '{command_name}' was not found in PATH.\n"),
+            );
+        }
+    }
+
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["shadowed"]),
+        0,
+        "No shadowed binaries found.\n",
+        "",
+    );
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["duplicates"]),
+        0,
+        "No duplicate command names found.\n",
+        "",
+    );
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["stats"]),
+        0,
+        "PATH entries: 1\n\
+         Existing directories: 1\n\
+         Missing PATH entries: 0\n\
+         Non-directory entries: 0\n\
+         Unreadable PATH directories: 0\n\
+         Empty PATH entries: 0\n\
+         Executable binaries: 0\n\
+         Unique command names: 0\n\
+         Duplicate command names: 0\n\
+         Shadowed binaries: 0\n\
+         Broken symlinks: 0\n",
+        "",
+    );
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["doctor"]),
+        0,
+        "No obvious PATH problems detected.\n",
+        "",
+    );
+}
+
 #[test]
 fn unset_path_is_reported_as_empty() {
     let temp = TempDir::new("unset");
@@ -128,4 +202,99 @@ fn broken_symlink_is_reported() {
 
     assert!(stdout.contains("Broken symlinks:\n"));
     assert!(stdout.contains(&format!("  {}\n", broken_link.display())));
+}
+
+#[test]
+fn invalid_path_categories_are_consistent_across_diagnostic_commands() {
+    let temp = TempDir::new("combined-invalid-categories");
+    let missing = temp.path.join("missing");
+    let non_directory = temp.path.join("not-a-directory");
+    fs::write(&non_directory, "not a directory\n").expect("create non-directory entry");
+
+    let bin_dir = temp.child_dir("bin");
+    let missing_target = temp.path.join("missing-target");
+    let broken_link = bin_dir.join("broken-tool");
+    symlink(&missing_target, &broken_link).expect("create broken symlink");
+
+    let unreadable = temp.child_dir("unreadable");
+    fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o000))
+        .expect("remove directory permissions");
+    let include_unreadable = fs::read_dir(&unreadable).is_err();
+
+    let mut entries: Vec<&Path> = vec![
+        Path::new(""),
+        missing.as_path(),
+        non_directory.as_path(),
+        bin_dir.as_path(),
+    ];
+    if include_unreadable {
+        entries.push(unreadable.as_path());
+    }
+    let path = std::env::join_paths(entries).expect("join invalid PATH entries");
+
+    let mut broken_stdout = format!(
+        "Missing PATH entries:\n  {}\n\
+         Non-directory PATH entries:\n  {}\n",
+        missing.display(),
+        non_directory.display()
+    );
+    if include_unreadable {
+        broken_stdout.push_str(&format!(
+            "Unreadable PATH directories:\n  {}\n",
+            unreadable.display()
+        ));
+    }
+    broken_stdout.push_str(&format!("Broken symlinks:\n  {}\n", broken_link.display()));
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["broken"]),
+        0,
+        &broken_stdout,
+        "",
+    );
+
+    let path_entries = if include_unreadable { 5 } else { 4 };
+    let existing_directories = if include_unreadable { 3 } else { 2 };
+    let unreadable_directories = usize::from(include_unreadable);
+    let stats_stdout = format!(
+        "PATH entries: {path_entries}\n\
+         Existing directories: {existing_directories}\n\
+         Missing PATH entries: 1\n\
+         Non-directory entries: 1\n\
+         Unreadable PATH directories: {unreadable_directories}\n\
+         Empty PATH entries: 1\n\
+         Executable binaries: 0\n\
+         Unique command names: 0\n\
+         Duplicate command names: 0\n\
+         Shadowed binaries: 0\n\
+         Broken symlinks: 1\n"
+    );
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["stats"]),
+        0,
+        &stats_stdout,
+        "",
+    );
+
+    let mut doctor_stdout =
+        "[WARN] PATH contains 1 empty entry/entries (current directory lookup).\n\
+                             [WARN] PATH contains 1 missing directory/directories.\n\
+                             [WARN] PATH contains 1 non-directory entry/entries.\n"
+            .to_string();
+    if include_unreadable {
+        doctor_stdout.push_str("[WARN] PATH contains 1 unreadable directory/directories.\n");
+    }
+    doctor_stdout.push_str("[WARN] Found 1 broken symlink(s) in PATH directories.\n");
+    let findings = if include_unreadable { 5 } else { 4 };
+    doctor_stdout.push_str(&format!(
+        "Doctor summary: {findings} issue category/categories detected.\n"
+    ));
+    assert_output(
+        &run_pathbin(Some(&path), &temp.path, &["doctor"]),
+        1,
+        &doctor_stdout,
+        "",
+    );
+
+    fs::set_permissions(&unreadable, fs::Permissions::from_mode(0o700))
+        .expect("restore directory permissions");
 }
